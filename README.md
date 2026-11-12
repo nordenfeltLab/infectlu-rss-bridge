@@ -1,28 +1,30 @@
 # Infect@LU RSS bridge
 
-An automatic RSS-to-HTML bridge for Infect@LU publications at Lund University. A GitHub Action fetches the official RSS feed and publishes a readable HTML page plus a JSON file via GitHub Pages.
+An automatic RSS-to-HTML bridge for Infect@LU publications at Lund University. A GitHub Action fetches the official RSS feed and publishes a readable HTML page plus JSON through GitHub Pages.
 
-## Setup in GitHub (one time)
+## What the tracker adds
 
-1. Create a new public repository named `infectlu-rss-bridge`. Choose **Public**, leave **Add a README file** disabled, **.gitignore** = None, **License** = None.
-2. Unzip the package locally. In Finder (macOS), open the inner `infectlu-rss-bridge` folder. Press **Command + Shift + .** if `.github` is hidden.
-3. Upload the three items *inside* that folder into the root of the GitHub repository: `README.md`, `scripts` folder, and `.github` folder. The zip file itself and the outer folder should not be uploaded. Commit directly to `main`.
-4. Under **Settings > Pages > Build and deployment**, select **Source = GitHub Actions** (NOT `Deploy from a branch`).
-5. Under **Actions**, select **Update Infect@LU RSS bridge**, choose **Run workflow**, **Branch = main**, then **Run workflow**.
-6. Verify the run has a green check. Under **Settings > Pages**, click **Visit site** and verify that the page includes a current **Last successful fetch** timestamp and actual publications.
-7. Your site will normally be `https://YOUR-GITHUB-USERNAME.github.io/infectlu-rss-bridge/`; JSON: `https://YOUR-GITHUB-USERNAME.github.io/infectlu-rss-bridge/feed.json`. Use the actual address from GitHub, not the example.
-8. Share your published page URL in ChatGPT so the monitoring workflow can be tested against it. Don't change the source in the monitoring task before that check succeeds.
+- Saves publication links and content fingerprints in `.state/seen_publications.json` in the repository.
+- Compares every successful run with the previous one, independent of publication date.
+- Adds `new_items`, `changed_items`, and counts to `feed.json`; the HTML page lists these separately from the current feed snapshot.
+- On the first upgraded run, compares against the previously published `feed.json` to seed the tracker. If that snapshot cannot be fetched, it establishes a baseline and reports that state in the page.
+- Keeps old IDs in the state file after they roll out of the monthly feed, preventing them from appearing new if they reappear.
+- Allows up to 1,000 parsed items per snapshot (the current version stops at 100), reducing the chance of silently truncating a busy month.
 
-## Running and failures
+“New” means newly present in the feed compared with the previous successful bridge snapshot. It does not mean newly published or automatically suitable for social media. Continue to check LUP’s record page, date added, DOI, abstract, author order, editorial fit and the existing publication queue.
 
-- Runs every Monday **05:00 UTC** (06:00 Swedish winter time; 07:00 Swedish summer time) plus on manual demand.
-- There is no API key and no recurring manual action.
-- The generated `docs/` folder is *not* checked into the repository; it is created during each Action run and published as a GitHub Pages artifact. **This is intentional.** GitHub Pages is configured using **GitHub Actions**, ensuring scheduled runs deploy fresh pages even though they do not push code changes.
-- If the RSS server cannot be accessed or produces no valid items, the action fails without replacing the previously published site. Check the **Actions** run logs.
-- The page is public and includes only publication records already exposed in the official public RSS feed.
+## One-time update
 
-## Limitations
+1. Download the ZIP and replace the repository's `scripts/fetch_rss.py`, `.github/workflows/update-feed.yml` and `README.md` with the copies in this archive. Commit to `main`.
+2. In GitHub, open **Settings → Actions → General** and confirm the workflow is allowed to grant **Read and write permissions** to `GITHUB_TOKEN`. The workflow needs this permission to commit the small state file.
+3. Run **Actions → Update Infect@LU RSS bridge → Run workflow** once. Confirm the run is green and check the published page and JSON.
+4. Subsequent Monday runs will compare with the stored state automatically. No weekly download or upload is needed.
 
-- The RSS monthly feed represents recent feed updates, not necessarily newly published articles; old publications may be edited or newly registered. ChatGPT still needs to check dates, DOI, subjects, author affiliation and whether an article has been featured before.
-- ChatGPT's browsing tool may cache public HTML pages, so check the displayed **Last successful fetch** timestamp before treating the data as current.
-- This package was validated with a sample RSS document. Its first GitHub Actions run is the actual test against the Lund University server.
+The action deploys the Pages snapshot before committing state. If deployment fails, tracking state is not advanced. If the state commit fails, the published snapshot still appears, and the next run may repeat its new/changed labels until state saves.
+
+## Existing settings
+
+- Runs every Monday at 05:00 UTC and on manual demand.
+- Pages uses the GitHub Actions deployment source.
+- No API key or paid service is required.
+- If the feed fails or contains no valid records, the action fails without deploying an empty snapshot.
